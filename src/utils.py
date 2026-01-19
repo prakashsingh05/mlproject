@@ -1,9 +1,12 @@
 import os
 import sys
+from xml.parsers.expat import model
 import dill
 from sklearn.metrics import r2_score
 
 from src.exception import CustomException
+
+from sklearn.model_selection import GridSearchCV
 
 
 def save_object(file_path, obj):
@@ -18,26 +21,35 @@ def save_object(file_path, obj):
         raise CustomException(e, sys)
 
 
-def evaluate_models(X_train, y_train, X_test, y_test, models):
+
+def evaluate_models(X_train, y_train, X_test, y_test, models, params):
     """
-    Train and evaluate multiple ML models
+    Train and evaluate multiple ML models using GridSearchCV
     """
     try:
         report = {}
 
         for model_name, model in models.items():
-            # Train model
-            model.fit(X_train, y_train)
+            param_grid = params[model_name]
 
-            # Predictions
-            y_train_pred = model.predict(X_train)
-            y_test_pred = model.predict(X_test)
+            gs = GridSearchCV(
+                estimator=model,      # ✅ ACTUAL MODEL OBJECT
+                param_grid=param_grid,
+                cv=3,
+                n_jobs=-1
+            )
 
-            # Scores
-            train_model_score = r2_score(y_train, y_train_pred)
-            test_model_score = r2_score(y_test, y_test_pred)
+            gs.fit(X_train, y_train)
 
-            report[model_name] = test_model_score
+            best_model = gs.best_estimator_
+
+            y_test_pred = best_model.predict(X_test)
+            test_score = r2_score(y_test, y_test_pred)
+
+            report[model_name] = test_score
+
+            # store trained model back
+            models[model_name] = best_model
 
         return report
 
